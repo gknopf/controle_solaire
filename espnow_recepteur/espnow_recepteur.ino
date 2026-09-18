@@ -23,7 +23,7 @@ typedef struct struct_message {
 struct_message myData;
 
 uint8_t calculateChecksum(struct_message *data) {
-  return (uint8_t)((data->device_id ^ data->tensionCC ^data->courant) & 0xFF);
+  return (uint8_t)((data->device_id ^ data->tensionCC ^ data->courant) & 0xFF);
 }
  
 
@@ -34,7 +34,9 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   memcpy(&myData, incomingData, sizeof(myData));
   //verifie le checksum
  uint8_t expectedChecksum =calculateChecksum(&myData);
- myData.checksum=expectedChecksum;
+ if (myData.checksum !=expectedChecksum){
+  Serial.printf("mydata.checksum:%dexpectedChecksum:%d\n",myData.checksum,expectedChecksum);
+ }
 
   
   Serial.printf("Espnow recu: device_id =%d |tensionCC=%d |courant=%d | checksum=%d \n",myData.device_id,myData.tensionCC,myData.courant,myData.checksum);

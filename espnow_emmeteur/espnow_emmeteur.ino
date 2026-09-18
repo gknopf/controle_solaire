@@ -15,9 +15,18 @@ typedef struct struct_message {
   uint8_t device_id;
   uint32_t tensionCC;  // Tension en mV
   uint32_t courant;    // Courant en mA
+  uint8_t checksum;
 } struct_message;
 
 struct_message myData;
+
+
+uint8_t calculateChecksum(struct_message *data){
+  return (uint8_t)((data->device_id ^ data->tensionCC ^ data->courant) &0xFF);
+}
+
+
+
 Adafruit_ADS1115 ads;
 
 // Paramètres du capteur de tension
@@ -86,7 +95,7 @@ void loop() {
   int voltageAdc = analogRead(voltagePin);
   float batteryVoltage = tensionConversionSlope * voltageAdc + tensionConversionOffset;
   myData.tensionCC = static_cast<int32_t>(batteryVoltage * 1000); // Conversion en mV
-
+  myData.checksum=calculateChecksum(&myData);
   // Affichage pour débogage
   Serial.print("Tension batterie: ");
   Serial.print(batteryVoltage, 3);
