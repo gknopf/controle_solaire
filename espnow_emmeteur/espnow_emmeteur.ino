@@ -8,16 +8,18 @@
 #define sclpin 3
 
 // Adresse MAC du récepteur
-uint8_t broadcastAddress[] = {0xe0, 0x72, 0xa1, 0x72, 0x33, 0xbc};
+uint8_t broadcastAddress[] = {0xe0, 0x72, 0xa1, 0x72, 0x34, 0xec};
 
 // Structure des données
+
+#pragma pack(push,1)
 typedef struct struct_message {
   uint8_t device_id;
-  uint32_t tensionCC;  // Tension en mV
-  uint32_t courant;    // Courant en mA
+  int32_t tensionCC;  // Tension en mV
+  int32_t courant;    // Courant en mA
   uint8_t checksum;
 } struct_message;
-
+#pragma pack(pop)
 struct_message myData;
 
 
@@ -57,7 +59,7 @@ void setup() {
     Serial.println("Erreur initialisation ESP-NOW");
     return;
   }
-
+  analogSetPinAttenuation(voltagePin, ADC_11db);
   esp_now_register_send_cb(esp_now_send_cb_t(OnDataSent));
 
   // Configuration du pair (récepteur)

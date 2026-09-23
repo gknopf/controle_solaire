@@ -4,6 +4,7 @@
 #include <LoRa.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 
 // --- Configuration LoRa ---
 const int LORA_CS = 5;
@@ -15,16 +16,15 @@ const long LORA_FREQ = 868E6;
 #pragma pack(push, 1)
 typedef struct {
   uint8_t sensorId;
-  int a;
-  float b;
-  char c;
+  int32_t tensionCC;
+  int32_t courant;
   uint8_t checksum;
 } SensorData;
 #pragma pack(pop)
 
 uint8_t calculateChecksum(SensorData *data) {
-  return (uint8_t)((data->sensorId ^ data->a ^ (int)(data->b * 100) ^ data->c) & 0xFF);
-}
+  return (uint8_t)((data->sensorId ^ data->tensionCC ^ data->courant) &0xFF);
+} 
 
 // --- Configuration Wi-Fi ---
 const char* wifi_ssid = "knobuntufree";
@@ -75,7 +75,21 @@ void publishToMQTT(SensorData *data, int rssi, float snr) {
     reconnectMQTT();
   }
 
+  
+
+
+
+ 
   // Créer un JSON pour les données (facultatif, mais utile pour Node-RED)
+  char output [100];
+  JsonDocument doc;
+  doc["sensorid"]=data->sensorId;
+  doc["tensionCC"]=data->tensionCC;
+  doc["courant"]=data->courant;
+  doc["rssi"]=rssi;
+  doc["snr"]=snr;
+  serializeJson(doc,output);
+  /*
   String payload = "{";
   payload += "\"sensorId\":" + String(data->sensorId) + ",";
   payload += "\"a\":" + String(data->a) + ",";
@@ -84,13 +98,22 @@ void publishToMQTT(SensorData *data, int rssi, float snr) {
   payload += "\"rssi\":" + String(rssi) + ",";
   payload += "\"snr\":" + String(snr);
   payload += "}";
-
+*/
   // Publier sur le topic MQTT
+
+   if (mqttClient.publish(mqtt_topic, output)) {
+    Serial.println("✅ Données publiées sur MQTT !");
+  } else {
+    Serial.println("❌ Échec de publication MQTT !");
+  }
+  /*
   if (mqttClient.publish(mqtt_topic, payload.c_str())) {
     Serial.println("✅ Données publiées sur MQTT !");
   } else {
     Serial.println("❌ Échec de publication MQTT !");
   }
+
+  */
 }
 
 void setup() {
@@ -132,17 +155,16 @@ void loop() {
 
     // Vérifier le checksum
     uint8_t expectedChecksum = calculateChecksum(&receivedData);
-    if (receivedData.checksum != expectedChecksum) {
-      Serial.println("❌ Checksum invalide (LoRa) !");
-      return;
+      if (receivedData.checksum !=expectedChecksum){
+      Serial.printf("receivedata.checksum:%dexpectedChecksum:%d\n",receivedData.checksum,expectedChecksum);
     }
 
     int rssi = LoRa.packetRssi();
     float snr = LoRa.packetSnr();
 
-    Serial.printf("✅ [LoRa] Capteur %d | a=%d | b=%.2f | c=%c\n",
-                  receivedData.sensorId, receivedData.a,
-                  receivedData.b, receivedData.c);
+    Serial.printf("✅ [LoRa] Capteur %d |tensionCC=%d | courant=%d" ,
+                  receivedData.sensorId, receivedData.tensionCC,
+                  receivedData.courant);
     Serial.printf("   RSSI: %d dBm | SNR: %.1f dB\n\n", rssi, snr);
 
     // Publier les données sur MQTT

@@ -1,5 +1,3 @@
-
-
 #include <esp_now.h>
 #include <WiFi.h>
 #include <HardwareSerial.h>
@@ -10,14 +8,15 @@ const int BAUD_RATE =115200;
 // Structure reception donnees
 // meme structure que l'emmeteur
 
-//#pragma pack(push,1)
+#pragma pack(push,1)
 typedef struct struct_message {
   uint8_t device_id;
-  uint32_t tensionCC;
-  uint32_t courant;
+  int32_t tensionCC;
+  int32_t courant;
   uint8_t checksum;
 } struct_message;
-//#pragma pack(pop)
+
+#pragma pack(pop)
 
 // Create a struct_message called myData
 struct_message myData;
@@ -31,6 +30,10 @@ uint8_t calculateChecksum(struct_message *data) {
 
 // callback function that will be executed when data is received
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+  if (len != sizeof(myData)) {
+  Serial.printf("Taille invalide: %d\n", len);
+  return;
+}
   memcpy(&myData, incomingData, sizeof(myData));
   //verifie le checksum
  uint8_t expectedChecksum =calculateChecksum(&myData);
@@ -41,6 +44,10 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   
   Serial.printf("Espnow recu: device_id =%d |tensionCC=%d |courant=%d | checksum=%d \n",myData.device_id,myData.tensionCC,myData.courant,myData.checksum);
   //transmission par Uar vers Esp wroom
+  uint8_t start_byte =0xAA;
+  SerialPort.write((uint8_t*)&start_byte,sizeof(start_byte));
+
+  
   SerialPort.write((uint8_t*)&myData,sizeof(myData));
 } 
   
