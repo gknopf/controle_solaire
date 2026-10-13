@@ -1,2 +1,3 @@
 log.txt
 *.tmp
+./lora_recepteur_nodered/secrets.h

@@ -1,11 +1,7 @@
 #include <esp_now.h>
 #include <WiFi.h>
-#include <Adafruit_ADS1X15.h>
-#include <Wire.h>
 
-// Broches I2C pour l'ADS1115 (fixées sur le PCB)
-#define sdapin 10
-#define sclpin 3
+
 
 // Adresse MAC du récepteur
 uint8_t broadcastAddress[] = {0xe0, 0x72, 0xa1, 0x72, 0x34, 0xec};
@@ -22,23 +18,20 @@ typedef struct struct_message {
 #pragma pack(pop)
 struct_message myData;
 
-
 uint8_t calculateChecksum(struct_message *data){
   return (uint8_t)((data->device_id ^ data->tensionCC ^ data->courant) &0xFF);
 }
-
-
-
-Adafruit_ADS1115 ads;
 
 // Paramètres du capteur de tension
 const int voltagePin = 4;       // Broche ADC pour la tension batterie
 const float tensionConversionSlope = 0.0182292;
 const float tensionConversionOffset = -0.005208;
+const float coef_ajust_voltage =0.911;
 
-// Paramètres du shunt et de l'ADS1115
-const float shuntSensitivity = 0.00075; // 0.75 mV/A
-const float gain = 16.0; // Gain de l'ADS1115
+
+
+// Paramètres du capteur de courant
+const int courantPin = 3;       // Broche ADC pour lle courant batterie
 
 esp_now_peer_info_t peerInfo;
 
@@ -59,11 +52,13 @@ void setup() {
     Serial.println("Erreur initialisation ESP-NOW");
     return;
   }
+
+  
   analogSetPinAttenuation(voltagePin, ADC_11db);
   esp_now_register_send_cb(esp_now_send_cb_t(OnDataSent));
 
   // Configuration du pair (récepteur)
-  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+ memcpy(peerInfo.peer_addr, broadcastAddress, 6);
   peerInfo.channel = 0;
   peerInfo.encrypt = false;
 
@@ -72,38 +67,34 @@ void setup() {
     return;
   }
 
-  // Initialisation de Wire avec les broches personnalisées
-  Wire.begin(sdapin, sclpin);
-
-  // Initialisation de l'ADS1115
-  if (!ads.begin()) {
-    Serial.println("Échec initialisation ADS1115");
-    while (1);
-  }
-  ads.setGain(GAIN_SIXTEEN); // Gain 16x pour ±0.256V
-
-  Serial.println("ADS1115 initialisé avec succès");
+ 
   myData.device_id = 1; // ID de l'appareil
 }
 
 void loop() {
-  // Lecture du courant via ADS1115 (A0 - A1)
-  int16_t courantAdc = ads.readADC_Differential_0_1();
-  float voltage = (courantAdc * 4.096) / (32767.0 * gain); // Conversion en volts
-  float current = voltage / shuntSensitivity; // Calcul du courant en A
-  myData.courant = static_cast<int32_t>(current * 1000); // Conversion en mA
+ 
 
-  // Lecture de la tension batterie
-  int voltageAdc = analogRead(voltagePin);
-  float batteryVoltage = tensionConversionSlope * voltageAdc + tensionConversionOffset;
+  // Lecture ducourantbatterie
+  int courantAdc = analogRead(courantPin);
+  //envoi du courant : la conversion en ampere se fait dans nodered fonction shunt.
+  myData.courant=courantAdc;
+  
+  //lecture de la tension batterie
+   int voltageAdc = analogRead(voltagePin);
+  float batteryVoltage =coef_ajust_voltage*( tensionConversionSlope * voltageAdc + tensionConversionOffset);
   myData.tensionCC = static_cast<int32_t>(batteryVoltage * 1000); // Conversion en mV
+  
   myData.checksum=calculateChecksum(&myData);
+  myData.checksum=calculateChecksum(&myData);
+  
   // Affichage pour débogage
+  
   Serial.print("Tension batterie: ");
   Serial.print(batteryVoltage, 3);
   Serial.print(" V, Courant: ");
-  Serial.print(current, 3);
-  Serial.println(" A");
+  Serial.print(" Courant: ");
+  Serial.print(courantAdc);
+  Serial.println(" bits");
 
   // Envoi des données via ESP-NOW
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
@@ -113,5 +104,5 @@ void loop() {
     Serial.println("Échec envoi des données");
   }
 
-  delay(2000); // Délai entre les envois
+  delay(10000); // Délai entre les envois
 }

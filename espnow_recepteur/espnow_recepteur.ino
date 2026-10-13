@@ -29,7 +29,7 @@ uint8_t calculateChecksum(struct_message *data) {
 
 
 // callback function that will be executed when data is received
-void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len) {
   if (len != sizeof(myData)) {
   Serial.printf("Taille invalide: %d\n", len);
   return;
@@ -41,14 +41,21 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   Serial.printf("mydata.checksum:%dexpectedChecksum:%d\n",myData.checksum,expectedChecksum);
  }
 
-  
-  Serial.printf("Espnow recu: device_id =%d |tensionCC=%d |courant=%d | checksum=%d \n",myData.device_id,myData.tensionCC,myData.courant,myData.checksum);
+  // 3) Affichage debug (source MAC + device_id)
+  Serial.printf("ESP-NOW recu [%02x:%02x:%02x:%02x:%02x:%02x] device_id=%d | "
+                "tension=%d mV | courant=%d mA\n",
+                info->src_addr[0], info->src_addr[1], info->src_addr[2],
+                info->src_addr[3], info->src_addr[4], info->src_addr[5],
+                myData.device_id, myData.tensionCC, myData.courant);
+
+ // Serial.printf("Espnow recu: device_id =%d |tensionCC=%d |courant=%d | checksum=%d \n",myData.device_id,myData.tensionCC,myData.courant,myData.checksum);
   //transmission par Uar vers Esp wroom
   uint8_t start_byte =0xAA;
-  SerialPort.write((uint8_t*)&start_byte,sizeof(start_byte));
-
-  
+  uint8_t stop_byte =0x55;
+  SerialPort.write((uint8_t*)&start_byte,sizeof(start_byte)); 
   SerialPort.write((uint8_t*)&myData,sizeof(myData));
+  SerialPort.write((uint8_t*)&stop_byte,sizeof(stop_byte));
+
 } 
   
  
